@@ -42,9 +42,13 @@ y06Blarge = sens6Blarge(1);
 
 %Define functions that simulate the response of each CS group, and return
 %it as a vector with the same length as sens6A, sens6B, and sens6Blarge.
-fsim6A = @(x,u) simulateMinusLowpassPL(u,x(1)/1000,t,x(2)*1000,x(3),x(4),x(5),u06A - (y06A - x(4)*u06A - x(5))/(x(2)*1000));
-fsim6B = @(x,u) simulateMinusLowpassPL(u,x(1)/1000,t,x(2)*1000,x(3),x(4),x(5),u06B - (y06B - x(4)*u06B - x(5))/(x(2)*1000));
-fsim6Blarge = @(x,u) simulateMinusLowpassPL(u,x(1)/1000,t,x(2)*1000,x(3),x(4),x(5),u06Blarge - (y06Blarge - x(4)*u06Blarge - x(5))/(x(2)*1000));
+% fsim6A = @(x,u) simulateMinusLowpassPL(u,x(1)/1000,t,x(2)*1000,x(3),x(4),x(5),u06A - (y06A - x(4)*u06A - x(5))/(x(2)*1000));
+% fsim6B = @(x,u) simulateMinusLowpassPL(u,x(1)/1000,t,x(2)*1000,x(3),x(4),x(5),u06B - (y06B - x(4)*u06B - x(5))/(x(2)*1000));
+% fsim6Blarge = @(x,u) simulateMinusLowpassPL(u,x(1)/1000,t,x(2)*1000,x(3),x(4),x(5),u06Blarge - (y06Blarge - x(4)*u06Blarge - x(5))/(x(2)*1000));
+
+fsim6A = @(x,u) max(0,x(1)*fgl_deriv( x(2), u, mean(diff(t))) );
+fsim6B = @(x,u) max(0,x(1)*fgl_deriv( x(2), u, mean(diff(t))) );
+fsim6Blarge = @(x,u) max(0,x(1)*fgl_deriv( x(2), u, mean(diff(t))) );
 
 %Using fsim functions, define cost functions that calculate the mean
 %squared error between each recording and the corresponding model output.
@@ -104,9 +108,9 @@ drawnow
 % USE GENETIC ALGORITHM TO FIT RESPONSES.
 % RUNS RAPIDLY AND GIVES GOOD RESULTS.
 
-lb = [.1;0;1;0;-100];
+lb = [0;0];
 lbLarge = lb;
-ub = [10;2;7;100;100];
+ub = [500;5];
 
 maxGen = 1000;
 convCrit = maxGen;
@@ -180,20 +184,14 @@ hold on
 plot(t,sens6Blarge,':','linewidth',1)
 ylabel('final')
 
-stick6AParams.tau = 1e-3*xf6A(1);
-stick6AParams.a = 1e3*xf6A(2);
-stick6AParams.b = xf6A(3);
-stick6AParams.c = xf6A(4);
-stick6AParams.d = xf6A(5);
+stick6AParamsFrac.a = xf6A(1);
+stick6AParamsFrac.b = xf6A(2);
 
-stick6BParams.tau = 1e-3*xf6B(1);
-stick6BParams.a = 1e3*xf6B(2);
-stick6BParams.b = xf6B(3);
-stick6BParams.c = xf6B(4);
-stick6BParams.d = xf6B(5);
+stick6BParamsFrac.a = xf6B(1);
+stick6BParamsFrac.b = xf6B(2);
 
-save('stick6AParams.mat','stick6AParams');
-save('stick6BParams.mat','stick6BParams');
+save('stick6AParamsFrac.mat','stick6AParamsFrac');
+save('stick6BParamsFrac.mat','stick6BParamsFrac');
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT TUNED MODEL RESPONSES
@@ -209,8 +207,8 @@ meanAbsErr6A = NaN(8,1);
 meanAbsErr6B = NaN(8,1);
 
 for i=1:8
-    fsim6A = @(x,u) simulateMinusLowpassPL(u,x(1)/1000,t,x(2)*1000,x(3),x(4),x(5),u06A - (y06A - x(4)*u06A - x(5))/(x(2)*1000));
-    fsim6B = @(x,u) simulateMinusLowpassPL(u,x(1)/1000,t,x(2)*1000,x(3),x(4),x(5),u06B - (y06B - x(4)*u06B - x(5))/(x(2)*1000));
+    fsim6A = @(x,u) max(0,x(1)*fgl_deriv( x(2), u, mean(diff(t))) );
+    fsim6B = @(x,u) max(0,x(1)*fgl_deriv( x(2), u, mean(diff(t))) );
     
     sim6A = fsim6A(xf6A,cleanedData{i}.u); %%GOTTA MAKE NEW fsim WITH NEW ICS
     sim6B = fsim6B(xf6B,-cleanedData{i}.u); %%GOTTA MAKE NEW fsim WITH NEW ICS
@@ -255,5 +253,5 @@ for i=1:8
     writecell([hdrs;datCell],filename,'Range',[columns{i},'1'])
 end
 
-save('stick6AFitError.mat','meanAbsErr6A');
-save('stick6BFitError.mat','meanAbsErr6B');
+save('stick6AFitErrorFrac.mat','meanAbsErr6A');
+save('stick6BFitErrorFrac.mat','meanAbsErr6B');

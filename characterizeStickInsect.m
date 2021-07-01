@@ -20,9 +20,10 @@ load('stick6BParams')
 %Compare to Figure 9 of Zill et al. 2021, J Neurophys
 peakForceVals = [.57,1.1,1.8,2.3,2.8];
 trial = 5;
-tmax = .77; %Time at which Zill et al. 2021 cuts off recording
-tmin = .05; %Reduce transient startup signals
+tmax = .77; %.77; %Time at which Zill et al. 2021 cuts off recording
+tmin = .013; %Reduce transient startup signals
 maxFfig = figure;
+indexShift = 1; %To correlate dudt and y, we may need to shift y by 1 index. This is because it takes time for the system to respond to the rate of change.
 
 tempColors = lines(10);
 customColor = [tempColors(2,:);tempColors(1,:);tempColors(7,:);tempColors(3,:);[.5,.5,.5]];
@@ -63,7 +64,7 @@ for j = 1:length(peakForceVals)
     
     subplot(2,2,4)
     hold on
-    scatter3(t(t<tmax & t>tmin),dudt(t<tmax & t>tmin),y6B(t<tmax & t>tmin),15,customColor(j,:),'filled')
+    scatter3(t(t<tmax & t>tmin),circshift(dudt(t<tmax & t>tmin),indexShift),y6B(t<tmax & t>tmin),15,customColor(j,:),'filled')
 %     xlim([0,.55])
     ylim([-30,20])
     zlim([0,300])

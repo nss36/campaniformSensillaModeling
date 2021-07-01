@@ -44,28 +44,32 @@ tEnd = .62;
 u1(t >= tStart) = min(A,A/T*t(1:sum(t >= tStart)));
 u1(t >= tEnd) = max(0,A-A/T*t(1:sum(t >= tEnd)));
 
-t1 = (0:1e-4:max(t))';
+h1 = 1e-4;
+t1 = (0:h1:max(t))';
 u11 = interp1(t,u1,t1);
 [y11,x11,du11dt] = simulateMinusLowpassPL(u11,tau,t1,a,b,c,d,0);
 
-x0 = [tau*1e3;a*1e-3;b;c;d];
+x0 = [50;.5];
 
 lb = [1;0;1;0;-100];
 ub = [100;2;5;100;100];
 
 t1t = linspace(0,tmax,length(RAHanimal.heightsMapped))';
 u1t = interp1(t,u1,t1t);
+h1t = mean(diff(t1t));
 
-u0 = u1t(1);
-y0 = RAHanimal.heightsMapped(1);
-lpf0 = @(x) u0 - (y0 -x(4)*u0 - x(5))/(1e3*x(2));
-g = @(x) simulateMinusLowpassPL(u1t,1e-3*x(1),t1t,1e3*x(2),x(3),x(4),x(5),lpf0(x));
-f = @(x) sum((g(x) - RAHanimal.heightsMapped).^2);
+g = @(x) max(0,x(1)*fgl_deriv( x(2), u1t, h1t ));
+f = @(x) sum( (g(x) - RAHanimal.heightsMapped).^2);
+
+figure
+hold on
+plot(t1t,RAHanimal.heightsMapped)
+plot(t1t,50*fgl_deriv( .5, u1t, h1t ),'--')
 
 options = optimoptions('fmincon','OptimalityTolerance',1e-12,'StepTolerance',1e-12,'UseParallel',false,'Display','iter');
 xf = fmincon( f,x0,[],[],[],[],lb,ub,[],options);
 
-%Values used in the manuscript:
+% Values used in the manuscript:
 % xf = [
 % 
 %     3.8595;
@@ -74,19 +78,19 @@ xf = fmincon( f,x0,[],[],[],[],lb,ub,[],options);
 %    54.2870;
 %   -41.1551];
 
-tau = 1e-3*xf(1);
-a = 1e3*xf(2);
-b = xf(3);
-c = xf(4);
-d = xf(5);
+a = xf(1);
+b = xf(2);
 
-cockroachParams.tau = tau;
-cockroachParams.a = a;
-cockroachParams.b = b;
-cockroachParams.c = c;
-cockroachParams.d = d;
+cockroachParamsFrac.a = a;
+cockroachParamsFrac.b = b;
 
-save('cockroachParams.mat','cockroachParams');
+save('cockroachParamsFrac.mat','cockroachParamsFrac');
+
+figure
+hold on
+plot(t1t,RAHanimal.heightsMapped)
+plot(t1t,max(0,a*fgl_deriv( b, u1t, h1t )),'--')
+
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT FIGURE 2 FROM THE MANUSCRIPT.
@@ -96,8 +100,11 @@ save('cockroachParams.mat','cockroachParams');
 %Factor of 0.6 scales the stimulus as presented in Zill et al. 2018, Fig 9.
 u2 = 0.6*ctr.data(:,2);
 
-[y1,x1,du1dt] = simulateMinusLowpassPL(u1,tau,t,a,b,c,d,0);
-[y2,x2,du2dt] = simulateMinusLowpassPL(u2,tau,t,a,b,c,d,lpf0(xf));
+% [y1,x1,du1dt] = simulateMinusLowpassPL(u1,tau,t,a,b,c,d,0);
+% [y2,x2,du2dt] = simulateMinusLowpassPL(u2,tau,t,a,b,c,d,lpf0(xf));
+
+y1 = max(0,a*fgl_deriv( b, u1, mean(diff(t)) ));
+y2 = max(0,a*fgl_deriv( b, u2, mean(diff(t)) ));
 
 h = figure;
 h.Position(2) = 100;
@@ -106,7 +113,7 @@ h.Position(4) = 450;
 
 colors = lines(6);
 
-meanAbsErr = NaN(2,1);
+meanAbsErrFrac = NaN(2,1);
 
 spa = subplot(2,4,1);
 p3 = plot(t/tmax*100,100*u1,'k','linewidth',2);
@@ -121,7 +128,7 @@ box off
 lgd = legend( [p1,p2,p3],{'Animal response (Hz)','Model response (Hz)','Force (100x mN)'},'Location','Southoutside');
 legend('boxoff')
 
-meanAbsErr(1) = mean(abs(RAHanimal.heightsMapped - interp1(t/tmax*100,y1,tRAH')));
+meanAbsErrFrac(1) = mean(abs(RAHanimal.heightsMapped - interp1(t/tmax*100,y1,tRAH')));
 
 spb = subplot(2,4,2);
 p6 = plot(t/tmax*100,100*u2,'k','linewidth',2);
@@ -138,7 +145,7 @@ box off
 legend( [p4,p5,p6],{'Animal Response (Hz)','Model Response (Hz)','Force (100x mN)'},'Location','Southoutside')
 legend('hide')
 
-meanAbsErr(2) = mean(abs(TWanimal.heightsMapped - interp1(t/tmax*100,y2,tTW')));
+meanAbsErrFrac(2) = mean(abs(TWanimal.heightsMapped - interp1(t/tmax*100,y2,tTW')));
 
 barColors = lines(4);
 barColors(1:2,:) = [];
@@ -158,7 +165,7 @@ xticks(0:20:100)
 legend(['Model ramp-',newline,'and-hold response'],['Model naturalistic',newline,'response'],'Location','Northeast')
 legend('boxoff')
 
-save('cockroachFitErr.mat','meanAbsErr');
+save('cockroachFitErrFrac.mat','meanAbsErrFrac');
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
 % MAKE SURE THIS TUNING GENERALLY WORKS BY APPLYING MORE RAMP STIMULI
@@ -194,7 +201,7 @@ end
 %Simulate model response to each ramp and plot it to produce figure 2.
 subplotIndices = [5,6,7,8];
 
-meanAbsErrRamps = NaN(4,1);
+meanAbsErrRampsFrac = NaN(4,1);
 
 for i=1:4    
     
@@ -205,7 +212,8 @@ for i=1:4
     u(u > Aramp(i)) = Aramp(i);
     
     %get the right time and u
-    y = simulateMinusLowpassPL(u,tau,tSim,a,b,c,d,0);
+%     y = simulateMinusLowpassPL(u,tau,tSim,a,b,c,d,0);
+    y = max(0,a*fgl_deriv( b, u, mean(diff(tSim)) ));
     
     figure(h)
     hold on
@@ -241,4 +249,4 @@ lgd.Position = [0.1250 0.5210 0.1993 0.0965];
 spa.Position = [0.1300 0.6940 0.1521 0.2239];
 spb.Position = [0.3361 0.6940 0.1521 0.2239];
 
-save('cockroachFitErrorRamps.mat','meanAbsErrRamps')
+save('cockroachFitErrorRampsFrac.mat','meanAbsErrRampsFrac')
