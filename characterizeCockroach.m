@@ -213,6 +213,7 @@ for i=1:numAmplitudes
     A = amplitudes(i);
     for j=1:numDurations
         T = durations(j);
+        tOff = t;
         uRelease = min(A/T*tOff,A);
         
         rate(i,j) = A/T;
